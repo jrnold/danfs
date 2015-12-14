@@ -5,8 +5,25 @@
 import urllib
 import requests
 import json
+from os import path
 from bs4 import BeautifulSoup
 
+from sqlalchemy import create_engine, Table, Column, String, MetaData
+
+metadata = MetaData()
+table_danfs = Table("danfs_ships", metadata,
+                    Column('id', String(), primary_key = True),
+                    Column('url', String(), nullable = False),
+                    Column('title', String()),
+                    Column('subtitle', String()),
+                    Column('history', String()))
+
+table_confederate = Table("confederate_ships", metadata,
+                    Column('id', String(), primary_key = True),
+                    Column('url', String(), nullable = False),
+                    Column('title', String()),
+                    Column('subtitle', String()),
+                    Column('history', String()))
 
 
 class DANFSClient(object):
@@ -54,13 +71,13 @@ class DANFSClient(object):
     def get_ship_text(self, path):
         shipurl = self.get_ship_url(path)
         r = requests.get(shipurl)
-        if r.status_code == requests.codes.ok:
-            html = r.text
-            soup = BeautifulSoup(html, 'lxml')
+        html = r.text
+        soup = BeautifulSoup(html, 'lxml')
+        try:
             bodyContainer = soup.find("div", class_ = "bodyContainer")
             text = ''.join(str(x) for x in bodyContainer.find_all("div", class_ = "text parbase section"))
-        else:
-            print("Cannot find %s" % path)
+        except AttributeError:
+            print("Problem with text in %s" % path)
             text = ''
         return text 
        
@@ -99,55 +116,47 @@ class DANFSClient(object):
             text = ''
         return text
 
-def get_confederate_ships():
+def insert_confederate_ships(con):
     client = DANFSClient()
-    data = []
-    for ship in client.get_confederate_ships_all():
+    ins = table_confederate.insert()
+    ships = client.get_confederate_ships_all()
+    for ship in ships:
         print(ship['title'])
-        data.append({'url': client.get_confederate_ship_url(ship['path']),
-                 'title': ship['title'],
-                 'subtitle': ship['subtitle'],
-                 'text': client.get_confederate_ship_text(ship['path'])})
-    return data
+        data = {'title': ship['title'],
+                'subtitle': ship['subtitle'],
+                'id': path.basename(ship['path']),
+                'history': client.get_confederate_ship_text(ship['path']),
+                'url': client.get_confederate_ship_url(ship['path'])
+                }
+        con.execute(ins, **data)
 
-def get_danfs():
+
+def insert_danfs(con):
+    EXCLUDE = ("What's New", )
     client = DANFSClient()
-    data = []
-    for ship in client.get_all_ship_urls():
+    ins = table_danfs.insert()
+    ships = client.get_all_ship_urls()
+    for ship in ships:
         print(ship['title'])
-        data.append({'url': client.get_ship_url(ship['path']),
-                 'title': ship['title'],
-                 'subtitle': ship['subtitle'],
-                 'text': client.get_ship_text(ship['path'])})
-    return data
+        if ship['title'] not in EXCLUDE:
+            data = {'title': ship['title'],
+                    'subtitle': ship['subtitle'],
+                    'id': path.basename(ship['path']),
+                    'history': client.get_ship_text(ship['path']),
+                    'url': client.get_ship_url(ship['path'])
+                    }
+        con.execute(ins, **data)
+
        
 def main():
-    DANFS_FILE = "danfs.json"
-    CONFED_FILE = "confederate_ships.json"
-    with(open(DANFS_FILE, "w")) as f:
-        print("Writing to %s" % DANFS_FILE)
-        json.dump(get_danfs(), f)
-    with(open(CONFED_FILE, "w")) as f:
-        print("Writing to %s" % CONFED_FILE)
-        json.dump(get_confederate_ships(), f)
+    DB = "sqlite:///dfas.sqlite3"
+    engine = create_engine(DB)
+    metadata.bind = engine
+    metadata.drop_all()
+    metadata.create_all()
+    con = metadata.bind
+    insert_danfs(con)
+    insert_confederate_ships(con)
     
 if __name__ == "__main__": 
     main()
-
-#engine = create_engine("sqlite:///:memory:")
-#metadata.bind = engine
-#metadata.drop_all()
-#metadata.create_all()
-#con = metadata.bind
-#ins = table_danfs.insert()
-
-#ships = client.get_all_ship_urls()
-#for ship in ships[:10]:
-#    ship['text'] = client.get_ship_text(ship['path'])
-#    con.execute(ins, **ship)
-
-    
-
-
-    
-
