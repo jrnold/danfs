@@ -149,14 +149,14 @@ def insert_danfs(con):
 
        
 def main():
-    DB = "sqlite:///dfas.sqlite3"
+    DB = "sqlite:///danfs.sqlite3"
     engine = create_engine(DB)
     metadata.bind = engine
-    #metadata.drop_all()
+    metadata.drop_all()
     metadata.create_all(checkfirst = True)
     con = metadata.bind
     insert_danfs(con)
-    #insert_confederate_ships(con)
+    insert_confederate_ships(con)
     
 if __name__ == "__main__": 
     main()
