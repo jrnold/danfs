@@ -1,27 +1,27 @@
 # -*- coding: utf-8 -*-
-"""Dowload data from the Dictionary of American Naval Fighting Ships (DANFS)
+"""Download data from the Dictionary of American Naval Fighting Ships (DANFS)
 """
-
-import urllib
-import requests
+import argparse
 import json
+import urllib
 from os import path
-from bs4 import BeautifulSoup
 
+import requests
+from bs4 import BeautifulSoup
 from sqlalchemy import create_engine, Table, Column, String, MetaData
 
 metadata = MetaData()
 table_danfs = Table("danfs_ships", metadata,
                     Column('id', String(), primary_key = True),
                     Column('url', String(), nullable = False),
-                    Column('title', String()),
+                    Column('title', String(), nullable = False),
                     Column('subtitle', String()),
                     Column('history', String()))
 
 table_confederate = Table("confederate_ships", metadata,
                     Column('id', String(), primary_key = True),
                     Column('url', String(), nullable = False),
-                    Column('title', String()),
+                    Column('title', String(), nullable = False),
                     Column('subtitle', String()),
                     Column('history', String()))
 
@@ -147,9 +147,7 @@ def insert_danfs(con):
                     }
             con.execute(ins, **data)
 
-       
-def main():
-    DB = "sqlite:///danfs.sqlite3"
+def build(dbname):
     engine = create_engine(DB)
     metadata.bind = engine
     metadata.drop_all()
@@ -157,6 +155,14 @@ def main():
     con = metadata.bind
     insert_danfs(con)
     insert_confederate_ships(con)
+       
+def main():
+    parser = parser = argparse.ArgumentParser(description="Download DANFS data into a database")
+    parser.add_argument('db', metavar='CONNECTION_STRING', nargs='1',
+                        help="A sqlalchemy connection string to use to directly execute generated SQL on a database.",
+                        default = "sqlite:///danfs.sqlite3")
+    args = parser.parse_args()
+    build(args.db)
     
 if __name__ == "__main__": 
     main()
